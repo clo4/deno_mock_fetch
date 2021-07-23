@@ -80,10 +80,10 @@ import ky from "https://cdn.skypack.dev/ky?dts";
 // This object can also be destructured.
 const mockFetch = mf.sandbox();
 
-// Create a ky instance that uses mocked fetch without ever touching the global
+// Make a ky instance that uses mocked fetch - never touching the global fetch.
+// Using a prefix URL means you won't need to write the URL every time.
 const myKy = ky.extend({
   fetch: mockFetch.fetch,
-  // Using a prefix URL means you won't need to write the URL every time
   prefixUrl: "https://anyurlyouwant.com",
 });
 
