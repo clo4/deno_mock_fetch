@@ -181,3 +181,20 @@ Deno.test({
     mf.uninstall();
   },
 });
+
+Deno.test({
+  name: "uninstall resets handlers",
+  async fn() {
+    mf.install();
+    mf.mock("/", () => new Response());
+
+    // don't need the response, just need to know this doesn't throw
+    await fetch("https://nice.dev/");
+
+    mf.uninstall();
+
+    await assertThrowsAsync(async () => {
+      await fetch("https://nice.dev/");
+    });
+  },
+});
