@@ -1,56 +1,100 @@
-import { MatchHandler, router } from "https://crux.land/router@0.0.3";
+import { MatchHandler, router, Routes } from "https://crux.land/router@0.0.4";
 
-type Fetch = typeof globalThis.fetch;
+class UnhandledRouteError extends Error {
+  routes: Routes;
+  request: Request;
+  constructor(init: { request: Request; routes: Routes }) {
+    const { request, routes } = init;
 
-const unmockedFetch = globalThis.fetch;
+    const method = request.method;
+    const reqPath = new URL(request.url).pathname;
+    const routesNumber = Object.entries(routes).length;
+    const routePlural = routesNumber === 1 ? "route" : "routes";
 
-/** Global store of routes. */
-const routeStore: Map<string, MatchHandler> = new Map();
+    // deno-fmt-ignore
+    super(`${method} ${reqPath} (${routesNumber} ${routePlural} have handlers)`);
 
-/**
- * Replacement for `fetch` that implements the same interface, but mocks
- * requests using a store of routes and handlers.
- */
-export async function mockedFetch(
-  ...args: Parameters<Fetch>
-): ReturnType<Fetch> {
-  let [input, init] = args;
-  if (input instanceof URL) input = input.toString();
-  const routes = Object.fromEntries(routeStore.entries());
-  const req = new Request(input, init);
-  const res = router(routes, (req) => {
-    const allRoutes = [...routeStore.keys()].join(", ");
-    throw new Error(
-      `Request not mocked: ${req.method} ${req.url}\n${allRoutes}`,
-    );
-  }, (_req, error) => {
-    throw error;
-  })(req);
-  return await res;
+    this.name = this.constructor.name;
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+
+    this.routes = routes;
+    this.request = request;
+  }
 }
 
-/**
- * Replace `window.fetch` with mock that routes requests to a matching handler.
- *
- * To reset `window.fetch`, call `uninstall()`.
- */
-export function install() {
-  globalThis.fetch = mockedFetch;
-}
+type MockFetch = {
+  fetch: typeof globalThis.fetch;
+  mock: (route: string, handler: MatchHandler) => void;
+  remove: (route: string) => void;
+  reset: () => void;
+};
 
 /**
- * Restore `window.fetch` to what it was before `install()` was called.
- */
-export function uninstall() {
-  globalThis.fetch = unmockedFetch;
+  * Create a stateful version of the global functions that do not contain
+  * any global state.
+  *
+  * The returned object can be destructured.
+  *
+  * ```
+  * const { fetch, mock, remove, reset } = sandbox()
+  * ```
+  */
+export function sandbox(): MockFetch {
+  const routeStore: Map<string, MatchHandler> = new Map();
+
+  async function fetch(
+    input: string | Request | URL,
+    init?: RequestInit,
+  ): Promise<Response> {
+    // Request constructor won't take a URL, so we need to normalize it first.
+    if (input instanceof URL) input = input.toString();
+    const req = new Request(input, init);
+
+    const routes = Object.fromEntries(routeStore.entries());
+
+    // The router needs to be constructed every time because the routes map is
+    // very likely to change between fetches.
+    return await router(
+      routes,
+      // If an unhandled route is fetched, throw an error.
+      (request) => {
+        throw new UnhandledRouteError({ request, routes });
+      },
+      // Errors thrown by a handler, including the unknown route handler, will
+      // return a 500 Internal Server Error. That's the right behaviour in most
+      // cases, but we actually *want* that to throw.
+      (_, error) => {
+        throw error;
+      },
+    )(req);
+  }
+
+  function mock(route: string, handler: MatchHandler) {
+    routeStore.set(route, handler);
+  }
+
+  function remove(route: string) {
+    routeStore.delete(route);
+  }
+
+  function reset() {
+    routeStore.clear();
+  }
+
+  return {
+    reset,
+    mock,
+    remove,
+    fetch,
+  };
 }
 
-/**
- * Remove all mocked routes and handlers.
- */
-export function reset() {
-  routeStore.clear();
-}
+const globalMockFetch = sandbox();
+
+/** This is the function that replaces `fetch` when you call `install()`. */
+export const mockedFetch = globalMockFetch.fetch;
 
 /**
  * Mock a new route, or override an existing handler.
@@ -68,11 +112,29 @@ export function reset() {
  * })
  * ```
  */
-export function mock(route: string, handler: MatchHandler) {
-  routeStore.set(route, handler);
-}
+export const mock = globalMockFetch.mock;
 
 /** Remove an existing route handler. */
-export function remove(route: string) {
-  routeStore.delete(route);
-}
+export const remove = globalMockFetch.remove;
+
+/** Remove all existing route handlers. */
+export const reset = globalMockFetch.reset;
+
+// Store the original fetch so it can be restored later
+const originalFetch = globalThis.fetch;
+
+/**
+ * Replace `window.fetch` with a mock that routes requests to a matching handler.
+ *
+ * To reset `window.fetch`, call `uninstall()`.
+ */
+export const install = () => {
+  globalThis.fetch = mockedFetch;
+};
+
+/**
+ * Restore `window.fetch` to what it was before `install()` was called.
+ */
+export const uninstall = () => {
+  globalThis.fetch = originalFetch;
+};
