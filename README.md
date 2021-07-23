@@ -2,17 +2,24 @@
 
 An _extremely_ simple `window.fetch` mock for Deno.
 
-## Usage
+## Get started
+
+This library is designed to get you going as fast as possible with the minimum
+code.
+
+### 1. Setup
 
 Import the library and install the mock. Any fetches after calling `install()`
 will throw an error if you haven't mocked the route.
 
 ```typescript
-import * as mf from "https://deno.land/x/mock_fetch@0.1.0/mod.ts";
+import * as mf from "https://deno.land/x/mock_fetch@0.2.0/mod.ts";
 
 // Replaces window.fetch with the mocked copy
 mf.install();
 ```
+
+### 2. Mocking routes
 
 Call `mock` with a route (optionally starting with a method specifier, eg.
 `DELETE@`) and a function (can be async). Whenever that route is fetched, the
@@ -29,26 +36,59 @@ const res = await fetch("https://localhost:1234/api/hello/SeparateRecords");
 const text = await res.text(); //=> "Hello, SeparateRecords!"
 ```
 
-You can remove all routes by calling `reset()`.
+### 3. Teardown
+
+You can remove a single route's handler with `remove`, or reset all handlers
+with `reset`. Once the handler has been removed, that route will go back to
+throwing.
 
 ```typescript
-mf.reset();
-// now, /api/hello/:name will throw again
+mf.remove("GET@/api/hello/:name"); // OR: mf.reset()
+
+await fetch("https://example.com/api/hello/world");
+// UnhandledRouteError: GET /api/hello/world (0 routes have handlers)
 ```
 
-And when you want to restore the un-mocked fetch, call `uninstall()`.
+To restore the original `fetch`, call `uninstall`.
 
 ```typescript
 mf.uninstall();
 ```
 
-Of course, you don't have to replace the global `fetch` function, you can access
-the mocked fetch directly via `mockedFetch`.
+## Advanced usage
+
+You don't have to replace the global fetch, or even have global state, by using
+the `sandbox` function. The returned object provides the same methods as the
+module (minus install & uninstall). Calling these methods will not alter global
+state.
 
 ```typescript
+// Ky is an excellent and easy-to-use fetch wrapper.
 import ky from "https://cdn.skypack.dev/ky?dts";
 
-const mockedKy = ky.extend({
-  fetch: mf.mockedFetch,
+// This object can also be destructured.
+const mockFetch = mf.sandbox();
+
+// Create a ky instance that uses mocked fetch without ever touching the global
+const myKy = ky.extend({
+  fetch: mockFetch.fetch,
+  // Using a prefix URL means you won't need to write the URL every time
+  prefixUrl: "https://anyurlyouwant.com",
+});
+
+// Now you can mock the routes like normal
+mockFetch.mock("PUT@/blog/posts", async (req) => {
+  return new Response(/* ... */);
+});
+
+myKy.put("blog/posts", {
+  /* ... */
 });
 ```
+
+You can destructure it, too.
+
+## Documentation
+
+The documentation is available at
+[doc.deno.land/https/deno.land/x/mock_fetch@0.2.0](https://doc.deno.land/https/deno.land/x/mock_fetch@0.2.0).
