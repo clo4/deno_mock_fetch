@@ -152,3 +152,32 @@ Deno.test({
     mf.uninstall();
   },
 });
+
+Deno.test({
+  name: "state isn't shared",
+  async fn() {
+    mf.install();
+
+    const fg = { fetch, mock: mf.mock, remove: mf.remove, reset: mf.reset };
+    const f1 = mf.sandbox();
+    const f2 = mf.sandbox();
+
+    fg.mock("/", () => new Response("global"));
+    f1.mock("/", () => new Response("1"));
+    f2.mock("/", () => new Response("2"));
+
+    const responses = await Promise.all([
+      fg.fetch("https://wow.cool/"),
+      f1.fetch("https://wow.cool/"),
+      f2.fetch("https://wow.cool/"),
+    ]);
+
+    const [tg, t1, t2] = await Promise.all(responses.map((res) => res.text()));
+
+    assertEquals(tg, "global");
+    assertEquals(t1, "1");
+    assertEquals(t2, "2");
+
+    mf.uninstall();
+  },
+});
