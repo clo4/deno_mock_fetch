@@ -137,4 +137,5 @@ export const install = () => {
  */
 export const uninstall = () => {
   globalThis.fetch = originalFetch;
+  reset();
 };
