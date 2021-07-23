@@ -41,9 +41,9 @@ type MockFetch = {
   * const { fetch, mock, remove, reset } = sandbox()
   * ```
   */
-export function sandbox(): MockFetch {
-  const routeStore: Map<string, MatchHandler> = new Map();
-
+export function sandbox(
+  routeStore: Map<string, MatchHandler> = new Map(),
+): MockFetch {
   async function fetch(
     input: string | Request | URL,
     init?: RequestInit,
