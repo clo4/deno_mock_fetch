@@ -30,6 +30,9 @@ function will be executed and the response will be returned.
 
 The route uses [path-to-regexp], which allows you to use wildcard parameters.
 
+**Only the path name will be used to match a handler**, so you can use literally
+anything for the host when fetching.
+
 [path-to-regexp]: https://github.com/pillarjs/path-to-regexp#parameters
 
 ```typescript
