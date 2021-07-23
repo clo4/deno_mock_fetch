@@ -44,50 +44,33 @@ type MockFetch = {
 export function sandbox(
   routeStore: Map<string, MatchHandler> = new Map(),
 ): MockFetch {
-  async function fetch(
-    input: string | Request | URL,
-    init?: RequestInit,
-  ): Promise<Response> {
-    // Request constructor won't take a URL, so we need to normalize it first.
-    if (input instanceof URL) input = input.toString();
-    const req = new Request(input, init);
-
-    const routes = Object.fromEntries(routeStore.entries());
-
-    // The router needs to be constructed every time because the routes map is
-    // very likely to change between fetches.
-    return await router(
-      routes,
-      // If an unhandled route is fetched, throw an error.
-      (request) => {
-        throw new UnhandledRouteError({ request, routes });
-      },
-      // Errors thrown by a handler, including the unknown route handler, will
-      // return a 500 Internal Server Error. That's the right behaviour in most
-      // cases, but we actually *want* that to throw.
-      (_, error) => {
-        throw error;
-      },
-    )(req);
-  }
-
-  function mock(route: string, handler: MatchHandler) {
-    routeStore.set(route, handler);
-  }
-
-  function remove(route: string) {
-    routeStore.delete(route);
-  }
-
-  function reset() {
-    routeStore.clear();
-  }
-
   return {
-    reset,
-    mock,
-    remove,
-    fetch,
+    mock: (route, handler) => routeStore.set(route, handler),
+    remove: (route) => routeStore.delete(route),
+    reset: () => routeStore.clear(),
+    fetch: async (input, init) => {
+      // Request constructor won't take a URL, so we need to normalize it first.
+      if (input instanceof URL) input = input.toString();
+      const req = new Request(input, init);
+
+      const routes = Object.fromEntries(routeStore.entries());
+
+      // The router needs to be constructed every time because the routes map is
+      // very likely to change between fetches.
+      return await router(
+        routes,
+        // If an unhandled route is fetched, throw an error.
+        (request) => {
+          throw new UnhandledRouteError({ request, routes });
+        },
+        // Errors thrown by a handler, including the unknown route handler, will
+        // return a 500 Internal Server Error. That's the right behaviour in most
+        // cases, but we actually *want* that to throw.
+        (_, error) => {
+          throw error;
+        },
+      )(req);
+    },
   };
 }
 
