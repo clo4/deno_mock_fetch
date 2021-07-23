@@ -4,7 +4,7 @@ An _extremely_ simple way to mock `window.fetch`.
 
 [Read the documentation][docs], or see "Usage" below.
 
-[docs]: https://doc.deno.land/https/deno.land/x/mock_fetch@0.2.0
+[docs]: https://doc.deno.land/https/deno.land/x/mock_fetch/mod.ts
 
 ## Usage
 
