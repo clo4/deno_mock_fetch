@@ -1,6 +1,6 @@
 # deno_mock_fetch
 
-An _extremely_ simple way to mock `window.fetch`.
+An _extremely_ simple way to mock `globalThis.fetch`.
 
 [Read the documentation][docs], or see "Usage" below.
 
@@ -14,9 +14,9 @@ Import the library and install the mock. Any fetches after calling `install()`
 will throw an error if you haven't explicitly added a mock for that route.
 
 ```typescript
-import * as mf from "https://deno.land/x/mock_fetch@0.2.0/mod.ts";
+import * as mf from "https://deno.land/x/mock_fetch@0.3.0/mod.ts";
 
-// Replaces window.fetch with the mocked copy
+// Replaces globalThis.fetch with the mocked copy
 mf.install();
 ```
 
@@ -28,16 +28,16 @@ Call `mock` with a route (optionally starting with a method specifier, eg.
 `DELETE@`) and a function (can be async). Whenever that route is fetched, the
 function will be executed and the response will be returned.
 
-The route uses [path-to-regexp], which allows you to use wildcard parameters.
+The route uses [URLPattern], which allows you to match patterns and wildcards.
 
 **Only the path name will be used to match a handler**, so you can use literally
 anything for the host when fetching.
 
-[path-to-regexp]: https://github.com/pillarjs/path-to-regexp#parameters
+[URLPattern]: https://github.com/WICG/urlpattern/blob/main/explainer.md#web-apis
 
 ```typescript
-mf.mock("GET@/api/hello/:name", (_req, match) => {
-  return new Response(`Hello, ${match.params["name"]}!`, {
+mf.mock("GET@/api/hello/:name", (_req, params) => {
+  return new Response(`Hello, ${params["name"]}!`, {
     status: 200,
   });
 });
@@ -55,7 +55,8 @@ with `reset`. Once the handler has been removed, that route will go back to
 throwing.
 
 ```typescript
-mf.remove("GET@/api/hello/:name"); // OR: mf.reset()
+mf.remove("GET@/api/hello/:name");
+// OR: mf.reset()
 
 await fetch("https://example.com/api/hello/world");
 // UnhandledRouteError: GET /api/hello/world (0 routes have handlers)
@@ -102,12 +103,16 @@ myKy.put("blog/posts", {
 
 You can destructure it, too.
 
+```typescript
+const { fetch, mock, remove, reset} = mf.sandbox();
+```
+
 <br>
 
 ## Credits
 
 **[@eliassjogreen]**'s tiny router ([source][router]) does the bulk of the work.
-It's general purpose, but works great for Deno Deploy.
+It's general-purpose, but works great for Deno Deploy.
 
 [@eliassjogreen]: https://github.com/eliassjogreen
-[router]: https://crux.land/router@0.0.4
+[router]: https://crux.land/router@0.0.5

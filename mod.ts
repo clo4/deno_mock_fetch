@@ -1,4 +1,6 @@
-import { MatchHandler, router, Routes } from "https://crux.land/router@0.0.4";
+import { MatchHandler, router, Routes } from "https://crux.land/router@0.0.5";
+
+export type { MatchHandler };
 
 class UnhandledRouteError extends Error {
   routes: Routes;
@@ -9,10 +11,12 @@ class UnhandledRouteError extends Error {
     const method = request.method;
     const reqPath = new URL(request.url).pathname;
     const routesNumber = Object.entries(routes).length;
-    const routePlural = routesNumber === 1 ? "route" : "routes";
+    const routePlural = routesNumber === 1
+      ? "route has a handler"
+      : "routes have handlers";
 
     // deno-fmt-ignore
-    super(`${method} ${reqPath} (${routesNumber} ${routePlural} have handlers)`);
+    super(`${method} ${reqPath} (${routesNumber} ${routePlural})`);
 
     this.name = this.constructor.name;
     if (Error.captureStackTrace) {
@@ -24,25 +28,24 @@ class UnhandledRouteError extends Error {
   }
 }
 
-type MockFetch = {
+export interface MockFetch {
   fetch: typeof globalThis.fetch;
   mock: (route: string, handler: MatchHandler) => void;
   remove: (route: string) => void;
   reset: () => void;
-};
+}
 
 /**
-  * Create a stateful version of the global functions that do not contain
-  * any global state.
-  *
-  * The returned object can be destructured.
-  *
-  * ```
-  * const { fetch, mock, remove, reset } = sandbox()
-  * ```
-  */
+ * Get a set of functions that do not share any state with the globals.
+ *
+ * The returned object can be destructured.
+ *
+ * ```
+ * const { fetch, mock, remove, reset } = sandbox()
+ * ```
+ */
 export function sandbox(): MockFetch {
-  const routeStore: Map<string, MatchHandler> = new Map();
+  const routeStore = new Map<string, MatchHandler>();
 
   async function fetch(
     input: string | Request | URL,
@@ -99,14 +102,15 @@ export const mockedFetch = globalMockFetch.fetch;
 /**
  * Mock a new route, or override an existing handler.
  *
- * The route uses path-to-regexp syntax, with the additional extension of
- * (optional) method routing (prefix with METHOD@, eg. `POST@/user/:id`).
+ * The route uses URLPattern syntax, with the additional extension of
+ * (optional) method routing by prefixing with the method,
+ * eg. `"POST@/user/:id"`.
  *
- * The handler function can either be a function or an async function.
+ * The handler function may be asynchronous.
  *
  * ```
- * mock("GET@/users/:id", async (_req, match) => {
- *   const id = parseInt(match.params["id"]);
+ * mock("GET@/users/:id", async (_req, params) => {
+ *   const id = parseInt(params["id"]);
  *   const data = await magicallyGetMyUserData(id);
  *   return new Response(JSON.stringify(data));
  * })
@@ -123,17 +127,20 @@ export const reset = globalMockFetch.reset;
 // Store the original fetch so it can be restored later
 const originalFetch = globalThis.fetch;
 
+// The functions below are `const` for consistency.
+
 /**
- * Replace `window.fetch` with a mock that routes requests to a matching handler.
+ * Replace `globalThis.fetch` with `mockedFetch` (or another function that
+ * matches the `fetch` signature)
  *
- * To reset `window.fetch`, call `uninstall()`.
+ * To restore the original `globalThis.fetch`, call `uninstall()`.
  */
-export const install = () => {
-  globalThis.fetch = mockedFetch;
+export const install = (replacement?: typeof fetch) => {
+  globalThis.fetch = replacement ?? mockedFetch;
 };
 
 /**
- * Restore `window.fetch` to what it was before `install()` was called.
+ * Restore `globalThis.fetch` to what it was before this library was imported.
  */
 export const uninstall = () => {
   globalThis.fetch = originalFetch;

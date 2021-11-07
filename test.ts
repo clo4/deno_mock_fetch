@@ -2,7 +2,7 @@ import {
   assertEquals,
   assertNotEquals,
   assertThrowsAsync,
-} from "https://deno.land/std@0.101.0/testing/asserts.ts";
+} from "https://deno.land/std@0.113.0/testing/asserts.ts";
 import * as mf from "./mod.ts";
 
 Deno.test({
@@ -81,7 +81,7 @@ Deno.test({
     mf.install();
 
     mf.mock("DELETE@/lights/:id", (_req, match) => {
-      assertEquals(match.params["id"], "2");
+      assertEquals(match["id"], "2");
       return new Response();
     });
 
